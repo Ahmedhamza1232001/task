@@ -333,6 +333,3 @@ dotnet test tests/Weather.IntegrationTests
 - Add API versioning
 - Optimize database queries with indexing
 
-## License
-
-This project is intended for interview and demonstration purposes.
