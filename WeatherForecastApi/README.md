@@ -1,393 +1,338 @@
 # Weather Forecast API
 
-A production-ready ASP.NET Core Web API for weather forecasting with JWT authentication, refresh token rotation, and caching.
+A production-style ASP.NET Core Web API demonstrating Clean Architecture, JWT authentication with refresh token rotation, and best practices for building maintainable backend services.
 
-## Project Overview
+## Project Description
 
-This API provides weather data for various cities with secure authentication. Key features include:
+This API provides weather forecast data for cities worldwide with secure user authentication. It serves as a demonstration of enterprise-level architecture patterns and security implementations.
 
-- **JWT Authentication** with refresh token rotation
-- **Weather data** from a mocked service (configurable for real API integration)
-- **In-memory caching** for performance optimization
-- **Clean Architecture** for maintainability and testability
-- **Comprehensive testing** with unit and integration tests
+### Key Features
 
-## Architecture
+- JWT-based authentication with refresh token rotation
+- Clean Architecture with separation of concerns
+- In-memory data persistence using EF Core
+- Request caching for improved performance
+- Comprehensive test coverage
+- Docker support for containerized deployment
+- OpenAPI documentation with Swagger UI
 
-The solution follows **Clean Architecture** principles with four layers:
+### Technologies
+
+- ASP.NET Core (.NET 9)
+- Entity Framework Core (InMemory Provider)
+- BCrypt.NET for password hashing
+- xUnit, Moq, FluentAssertions for testing
+- Swagger/OpenAPI for documentation
+- Docker for containerization
+
+## Architecture Overview
+
+The solution follows Clean Architecture principles, organizing code into four distinct layers with clear dependency boundaries.
 
 ```
 WeatherForecastApi/
 ├── src/
-│   ├── Weather.Api/           # Presentation Layer - Controllers, Middleware
-│   ├── Weather.Application/   # Application Layer - Services, DTOs, Interfaces
-│   ├── Weather.Domain/        # Domain Layer - Entities
-│   └── Weather.Infrastructure/# Infrastructure Layer - EF Core, Auth, Caching
+│   ├── Weather.Api/              # Presentation layer
+│   │   ├── Controllers/          # HTTP endpoints
+│   │   ├── Middleware/           # Exception handling
+│   │   └── Program.cs            # Application entry point
+│   │
+│   ├── Weather.Application/      # Application layer
+│   │   ├── DTOs/                 # Data transfer objects
+│   │   ├── Exceptions/           # Custom exceptions
+│   │   ├── Interfaces/           # Service contracts
+│   │   └── Services/             # Business logic
+│   │
+│   ├── Weather.Domain/           # Domain layer
+│   │   └── Entities/             # Core business entities
+│   │
+│   └── Weather.Infrastructure/   # Infrastructure layer
+│       ├── Configuration/        # Settings classes
+│       ├── Data/                 # EF Core DbContext
+│       ├── Repositories/         # Data access
+│       └── Services/             # External service implementations
+│
 ├── tests/
-│   ├── Weather.UnitTests/     # Unit tests
+│   ├── Weather.UnitTests/        # Unit tests
 │   └── Weather.IntegrationTests/ # Integration tests
+│
 ├── Dockerfile
+├── .gitignore
 └── README.md
 ```
 
 ### Layer Responsibilities
 
-| Layer | Responsibility |
-|-------|----------------|
-| **Domain** | Core business entities (User, RefreshToken, WeatherData) |
-| **Application** | Business logic, DTOs, service interfaces |
-| **Infrastructure** | Data access, external services, authentication |
-| **API** | HTTP endpoints, middleware, DI configuration |
+| Layer | Purpose |
+|-------|---------|
+| Domain | Contains core entities (User, RefreshToken, WeatherData) with no external dependencies |
+| Application | Defines interfaces, DTOs, and orchestrates business logic |
+| Infrastructure | Implements data access, authentication, caching, and external services |
+| API | Handles HTTP requests, routing, and middleware configuration |
 
-### Dependency Flow
+## Prerequisites
 
+- .NET 9.0 SDK or later
+- Docker (optional, for containerized deployment)
+- Git
+
+## Running the Application
+
+### Run Locally
+
+```bash
+# Clone and navigate to project
+cd WeatherForecastApi
+
+# Restore dependencies
+dotnet restore
+
+# Run the application
+dotnet run --project src/Weather.Api
+
+# Application will start on https://localhost:5001 and http://localhost:5000
 ```
-API → Application ← Infrastructure
-         ↓
-       Domain
+
+### Run with Docker
+
+```bash
+# Build the Docker image
+docker build -t weather-api .
+
+# Run the container
+docker run -p 8080:8080 weather-api
+
+# Access the API at http://localhost:8080
 ```
 
 ## Authentication Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     AUTHENTICATION FLOW                          │
-└─────────────────────────────────────────────────────────────────┘
+The API implements JWT authentication with refresh token rotation for enhanced security.
 
-1. REGISTRATION
-   ┌────────┐    POST /api/auth/register     ┌────────┐
-   │ Client │ ─────────────────────────────► │  API   │
-   └────────┘    {email, username, password} └────────┘
-                                                  │
-                                                  ▼
-                                          ┌──────────────┐
-                                          │ Hash Password│
-                                          │ Store User   │
-                                          │ Generate JWT │
-                                          │ + Refresh    │
-                                          └──────────────┘
-                                                  │
-   ┌────────┐    {accessToken, refreshToken}     │
-   │ Client │ ◄──────────────────────────────────┘
-   └────────┘
+### Flow Overview
 
-2. LOGIN
-   ┌────────┐    POST /api/auth/login        ┌────────┐
-   │ Client │ ─────────────────────────────► │  API   │
-   └────────┘    {email, password}           └────────┘
-                                                  │
-                                                  ▼
-                                          ┌──────────────┐
-                                          │Verify Password│
-                                          │ Generate JWT │
-                                          │ + Refresh    │
-                                          └──────────────┘
-                                                  │
-   ┌────────┐    {accessToken, refreshToken}     │
-   │ Client │ ◄──────────────────────────────────┘
-   └────────┘
+1. **Registration**: User submits email, username, and password. Server returns access token and refresh token.
 
-3. ACCESSING PROTECTED RESOURCES
-   ┌────────┐  GET /api/weather?city=London  ┌────────┐
-   │ Client │ ─────────────────────────────► │  API   │
-   └────────┘  Authorization: Bearer {token} └────────┘
-                                                  │
-                                                  ▼
-                                          ┌──────────────┐
-                                          │ Validate JWT │
-                                          │ Return Data  │
-                                          └──────────────┘
-                                                  │
-   ┌────────┐    {city, temperature, ...}        │
-   │ Client │ ◄──────────────────────────────────┘
-   └────────┘
+2. **Login**: User submits credentials. Server validates and returns new token pair.
 
-4. TOKEN REFRESH (Rotation)
-   ┌────────┐    POST /api/auth/refresh      ┌────────┐
-   │ Client │ ─────────────────────────────► │  API   │
-   └────────┘    {refreshToken}              └────────┘
-                                                  │
-                                                  ▼
-                                          ┌──────────────┐
-                                          │Validate Token│
-                                          │ Revoke Old   │
-                                          │ Issue New    │
-                                          └──────────────┘
-                                                  │
-   ┌────────┐  {NEW accessToken, refreshToken}   │
-   │ Client │ ◄──────────────────────────────────┘
-   └────────┘
-```
+3. **Accessing Resources**: Client includes access token in Authorization header. Server validates token and processes request.
+
+4. **Token Refresh**: When access token expires, client sends refresh token. Server validates, revokes old refresh token, and issues new token pair.
+
+### Token Specifications
+
+| Token Type | Expiration | Storage |
+|------------|------------|---------|
+| Access Token | 15 minutes | Client-side (memory/secure storage) |
+| Refresh Token | 7 days | Server-side (database) |
+
+### Security Features
+
+- Refresh tokens are single-use and rotated on each refresh
+- Used refresh tokens are immediately revoked
+- Passwords are hashed using BCrypt with automatic salting
 
 ## API Endpoints
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/auth/register` | Register new user | No |
-| POST | `/api/auth/login` | Login and get tokens | No |
-| POST | `/api/auth/refresh` | Refresh access token | No |
-| GET | `/api/weather?city={city}` | Get weather for city | Yes |
-| GET | `/health` | Health check endpoint | No |
+### Authentication Endpoints
 
-## How to Run Locally
+#### Register a New User
 
-### Prerequisites
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "username": "johndoe",
+    "password": "SecurePass123"
+  }'
+```
 
-- .NET 9.0 SDK or later
-- (Optional) Docker for containerized deployment
-
-### Running the Application
-
-1. **Clone the repository**
-   ```bash
-   cd WeatherForecastApi
-   ```
-
-2. **Restore dependencies**
-   ```bash
-   dotnet restore
-   ```
-
-3. **Run the application**
-   ```bash
-   dotnet run --project src/Weather.Api
-   ```
-
-4. **Access Swagger UI**
-
-   Open your browser and navigate to: `https://localhost:5001` or `http://localhost:5000`
-
-### Environment Configuration
-
-The application uses `appsettings.json` for configuration:
-
+Response:
 ```json
 {
-  "Jwt": {
-    "SecretKey": "your-secret-key-min-32-chars",
-    "Issuer": "WeatherForecastApi",
-    "Audience": "WeatherForecastApiUsers",
-    "AccessTokenExpirationMinutes": 15,
-    "RefreshTokenExpirationDays": 7
-  }
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2g...",
+  "expiresAt": "2024-01-15T10:30:00Z"
 }
 ```
 
-## How to Run Tests
-
-### Run All Tests
+#### Login
 
 ```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+#### Refresh Access Token
+
+```bash
+curl -X POST http://localhost:8080/api/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2g..."
+  }'
+```
+
+### Weather Endpoint
+
+#### Get Weather Data (Requires Authentication)
+
+```bash
+curl -X GET "http://localhost:8080/api/weather?city=London" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
+```
+
+Response:
+```json
+{
+  "city": "London",
+  "temperatureCelsius": 15.5,
+  "condition": "Cloudy",
+  "date": "2024-01-15T10:00:00Z"
+}
+```
+
+### Endpoint Summary
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/auth/register` | Create new user account | No |
+| POST | `/api/auth/login` | Authenticate and get tokens | No |
+| POST | `/api/auth/refresh` | Refresh access token | No |
+| GET | `/api/weather` | Get weather for city | Yes |
+| GET | `/health` | Health check endpoint | No |
+
+## Swagger
+
+Swagger UI is available in development mode for API exploration and testing.
+
+### Access Swagger
+
+Navigate to: `http://localhost:8080` (or `https://localhost:5001` when running locally)
+
+### Authorize in Swagger
+
+1. Click the **Authorize** button in the top right
+2. Enter your JWT token in the format: `Bearer <your-token>`
+3. Click **Authorize** to apply
+4. Execute authenticated requests
+
+## Testing
+
+The project includes comprehensive test coverage with both unit and integration tests.
+
+### Unit Tests (45 tests)
+
+Located in `tests/Weather.UnitTests/`, covering:
+
+- Authentication service logic (registration, login, token refresh)
+- Password hashing functionality
+- JWT token generation and validation
+- Weather service behavior
+- Cache hit/miss scenarios
+
+### Integration Tests (20 tests)
+
+Located in `tests/Weather.IntegrationTests/`, covering:
+
+- Complete authentication flows
+- Protected endpoint access control
+- Token refresh and rotation
+- Error handling scenarios
+- End-to-end user journeys
+
+### Run Tests
+
+```bash
+# Run all tests
 dotnet test
-```
 
-### Run with Verbosity
-
-```bash
+# Run with detailed output
 dotnet test --verbosity normal
-```
 
-### Run Specific Test Project
-
-```bash
-# Unit tests only
+# Run specific test project
 dotnet test tests/Weather.UnitTests
-
-# Integration tests only
 dotnet test tests/Weather.IntegrationTests
 ```
 
-### Test Coverage
-
-The test suite includes:
-
-- **45 Unit Tests** covering:
-  - Authentication service logic
-  - Password hashing
-  - JWT token generation
-  - Weather service behavior
-  - Cache hit/miss scenarios
-
-- **20 Integration Tests** covering:
-  - Complete registration flow
-  - Login with valid/invalid credentials
-  - Token refresh and rotation
-  - Protected endpoint access
-  - Full end-to-end scenarios
-
-## How to Run with Docker
-
-### Build the Image
-
-```bash
-docker build -t weather-api .
-```
-
-### Run the Container
-
-```bash
-docker run -p 8080:8080 weather-api
-```
-
-### Access the API
-
-- API Base URL: `http://localhost:8080`
-- Health Check: `http://localhost:8080/health`
-
-### Docker Compose (Optional)
-
-Create a `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-services:
-  weather-api:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - Jwt__SecretKey=YourProductionSecretKeyHere123!
-```
-
-Run with:
-```bash
-docker-compose up
-```
-
-## Performance & Caching
-
-### Caching Strategy
-
-The API implements **in-memory caching** for weather data:
-
-- **Cache Key Format**: `weather:{city}` (case-insensitive)
-- **Cache Duration**: 5 minutes
-- **Cache Provider**: `IMemoryCache`
-
-### How Caching Works
-
-```
-┌─────────┐     GET /weather?city=London     ┌─────────────┐
-│ Client  │ ────────────────────────────────►│   API       │
-└─────────┘                                  └──────┬──────┘
-                                                    │
-                                                    ▼
-                                            ┌──────────────┐
-                                            │ Check Cache  │
-                                            └──────┬───────┘
-                                                   │
-                              ┌────────────────────┴────────────────────┐
-                              │                                         │
-                        Cache HIT                                  Cache MISS
-                              │                                         │
-                              ▼                                         ▼
-                    ┌──────────────┐                          ┌──────────────┐
-                    │Return Cached │                          │ Call Weather │
-                    │    Data      │                          │   Service    │
-                    └──────────────┘                          └──────┬───────┘
-                                                                     │
-                                                                     ▼
-                                                            ┌──────────────┐
-                                                            │ Store in     │
-                                                            │ Cache (5min) │
-                                                            └──────────────┘
-```
-
-### Benefits
-
-1. **Reduced latency** for repeated requests
-2. **Lower load** on weather data source
-3. **Consistent responses** within cache window
-
 ## Security Notes
 
-### Password Security
+### Password Storage
 
-- Passwords are hashed using **BCrypt** with automatic salt generation
-- Plain text passwords are never stored
+- Passwords are never stored in plain text
+- BCrypt hashing with automatic salt generation
+- Hash verification performed server-side only
 
-### JWT Security
+### Token Security
 
-- Access tokens expire after **15 minutes**
-- Refresh tokens expire after **7 days**
-- Refresh tokens are **rotated** on each use (one-time use)
-- Used refresh tokens are **revoked** immediately
+- Access tokens are short-lived (15 minutes) to limit exposure
+- Refresh tokens are rotated on each use, preventing replay attacks
+- Revoked tokens are tracked server-side
+- JWT includes user ID and email claims
 
-### Best Practices Implemented
+### Recommendations for Production
 
-1. **No secrets in code** - Configuration via environment variables
-2. **Token rotation** - Prevents refresh token theft attacks
-3. **Short-lived access tokens** - Limits exposure window
-4. **Server-side refresh token storage** - Enables revocation
-5. **Centralized error handling** - Prevents information leakage
-6. **Input validation** - Prevents injection attacks
+- Store JWT secret key in secure vault (Azure Key Vault, AWS Secrets Manager)
+- Enable HTTPS only
+- Implement rate limiting on authentication endpoints
+- Add request logging and monitoring
+- Consider token blacklisting for logout functionality
 
-### Production Recommendations
+## Assumptions and Limitations
 
-- Use HTTPS in production
-- Store JWT secret key securely (e.g., Azure Key Vault, AWS Secrets Manager)
-- Consider rate limiting for authentication endpoints
-- Implement logging and monitoring
-- Replace InMemory database with a production database (PostgreSQL, SQL Server)
+### Current Implementation
 
-## Project Structure Details
+- **In-Memory Database**: All data is lost when the application restarts. Suitable for demonstration purposes only.
 
-```
-src/
-├── Weather.Api/
-│   ├── Controllers/
-│   │   ├── AuthController.cs      # Authentication endpoints
-│   │   └── WeatherController.cs   # Weather data endpoint
-│   ├── Middleware/
-│   │   └── ExceptionHandlingMiddleware.cs
-│   ├── Program.cs                 # Application entry point
-│   └── appsettings.json           # Configuration
-│
-├── Weather.Application/
-│   ├── DTOs/
-│   │   ├── AuthDtos.cs           # Auth request/response DTOs
-│   │   └── WeatherDtos.cs        # Weather response DTO
-│   ├── Exceptions/               # Custom exceptions
-│   ├── Interfaces/               # Service contracts
-│   └── Services/
-│       └── AuthService.cs        # Authentication logic
-│
-├── Weather.Domain/
-│   └── Entities/
-│       ├── User.cs
-│       ├── RefreshToken.cs
-│       └── WeatherData.cs
-│
-└── Weather.Infrastructure/
-    ├── Configuration/
-    │   └── JwtSettings.cs
-    ├── Data/
-    │   └── ApplicationDbContext.cs
-    ├── Repositories/
-    │   ├── UserRepository.cs
-    │   └── RefreshTokenRepository.cs
-    ├── Services/
-    │   ├── BcryptPasswordHasher.cs
-    │   ├── JwtTokenService.cs
-    │   ├── MockWeatherService.cs
-    │   └── CachedWeatherService.cs
-    └── DependencyInjection.cs
-```
+- **Mocked Weather Provider**: Weather data is generated from predefined ranges per city. No external API calls are made.
 
-## Technology Stack
+- **Single Instance**: No distributed caching or session management. Not suitable for load-balanced deployments without modification.
 
-| Component | Technology |
-|-----------|------------|
-| Framework | ASP.NET Core |
-| ORM | Entity Framework Core (InMemory) |
-| Authentication | JWT Bearer |
-| Password Hashing | BCrypt.Net |
-| Caching | IMemoryCache |
-| Testing | xUnit, Moq, FluentAssertions |
-| Documentation | Swagger/OpenAPI |
-| Containerization | Docker |
+- **No Email Verification**: User registration does not require email confirmation.
+
+### Not Production-Ready
+
+- No persistent data storage
+- No SSL certificate configuration
+- No rate limiting
+- No logging to external systems
+- Hardcoded JWT secret in configuration
+
+## Future Improvements
+
+### Data Persistence
+- Replace InMemory provider with PostgreSQL or SQL Server
+- Implement database migrations
+- Add connection pooling and retry policies
+
+### External Integration
+- Integrate real weather API (OpenWeatherMap, WeatherAPI)
+- Add circuit breaker pattern for external calls
+- Implement response caching with Redis
+
+### Security Enhancements
+- Add rate limiting middleware
+- Implement account lockout after failed attempts
+- Add two-factor authentication
+- Implement token revocation on password change
+
+### Infrastructure
+- Add structured logging (Serilog, Application Insights)
+- Implement health checks for dependencies
+- Add CI/CD pipeline configuration
+- Create Kubernetes deployment manifests
+
+### Performance
+- Add distributed caching with Redis
+- Implement response compression
+- Add API versioning
+- Optimize database queries with indexing
 
 ## License
 
-This project is for interview/demonstration purposes.
+This project is intended for interview and demonstration purposes.
